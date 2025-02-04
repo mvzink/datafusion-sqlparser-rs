@@ -5533,3 +5533,11 @@ fn parse_varbit_datatype() {
         _ => unreachable!(),
     }
 }
+
+#[test]
+fn parse_set_names() {
+    pg_and_generic().verified_stmt("SET NAMES 'UTF8'");
+    pg_and_generic().verified_stmt("SET NAMES 'utf8'");
+    pg().parse_sql_statements("SET NAMES 'UTF8' COLLATE bogus")
+        .expect_err("Postgres does not support COLLATE");
+}
