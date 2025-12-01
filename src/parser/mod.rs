@@ -9681,6 +9681,103 @@ impl<'a> Parser<'a> {
             let equals = self.consume_token(&Token::Eq);
             let value = self.parse_number_value()?;
             AlterTableOperation::AutoIncrement { equals, value }
+        } else if self.parse_keyword(Keyword::CHECKSUM) {
+            let equals = self.consume_token(&Token::Eq);
+            let num = self.parse_number_value()?;
+            let value_u8 = match &num.value {
+                #[cfg(not(feature = "bigdecimal"))]
+                Value::Number(s, _) => match s.as_str() {
+                    "0" => 0,
+                    "1" => 1,
+                    _ => return self.expected("0 or 1 after CHECKSUM [=]", self.peek_token()),
+                },
+                #[cfg(feature = "bigdecimal")]
+                Value::Number(n, _) => {
+                    if n == &0.into() {
+                        0
+                    } else if n == &1.into() {
+                        1
+                    } else {
+                        return self.expected("0 or 1 after CHECKSUM [=]", self.peek_token())
+                    }
+                }
+                _ => return self.expected("0 or 1 after CHECKSUM [=]", self.peek_token()),
+            };
+            AlterTableOperation::Checksum { equals, value: value_u8 }
+        } else if self.parse_keyword(Keyword::DELAY_KEY_WRITE) {
+            let equals = self.consume_token(&Token::Eq);
+            let num = self.parse_number_value()?;
+            let value_u8 = match &num.value {
+                #[cfg(not(feature = "bigdecimal"))]
+                Value::Number(s, _) => match s.as_str() {
+                    "0" => 0,
+                    "1" => 1,
+                    _ => return self.expected("0 or 1 after DELAY_KEY_WRITE [=]", self.peek_token()),
+                },
+                #[cfg(feature = "bigdecimal")]
+                Value::Number(n, _) => {
+                    if n == &0.into() {
+                        0
+                    } else if n == &1.into() {
+                        1
+                    } else {
+                        return self.expected("0 or 1 after DELAY_KEY_WRITE [=]", self.peek_token())
+                    }
+                }
+                _ => return self.expected("0 or 1 after DELAY_KEY_WRITE [=]", self.peek_token()),
+            };
+            AlterTableOperation::DelayKeyWrite { equals, value: value_u8 }
+        } else if self.parse_keyword(Keyword::FORCE) {
+            AlterTableOperation::Force
+        } else if self.parse_keyword(Keyword::ROW_FORMAT) {
+            let equals = self.consume_token(&Token::Eq);
+            let format = match self.parse_one_of_keywords(&[
+                Keyword::DEFAULT,
+                Keyword::DYNAMIC,
+                Keyword::FIXED,
+                Keyword::COMPRESSED,
+                Keyword::REDUNDANT,
+                Keyword::COMPACT,
+            ]) {
+                Some(Keyword::DEFAULT) => AlterTableRowFormat::Default,
+                Some(Keyword::DYNAMIC) => AlterTableRowFormat::Dynamic,
+                Some(Keyword::FIXED) => AlterTableRowFormat::Fixed,
+                Some(Keyword::COMPRESSED) => AlterTableRowFormat::Compressed,
+                Some(Keyword::REDUNDANT) => AlterTableRowFormat::Redundant,
+                Some(Keyword::COMPACT) => AlterTableRowFormat::Compact,
+                _ => self.expected(
+                    "DEFAULT, DYNAMIC, FIXED, COMPRESSED, REDUNDANT, or COMPACT after ROW_FORMAT [=]",
+                    self.peek_token(),
+                )?,
+            };
+            AlterTableOperation::RowFormat { equals, format }
+        } else if self.parse_keyword(Keyword::STATS_AUTO_RECALC) {
+            let equals = self.consume_token(&Token::Eq);
+            let value = if self.parse_keyword(Keyword::DEFAULT) {
+                AlterTableStatsAutoRecalc::Default
+            } else {
+                let num = self.parse_number_value()?;
+                match &num.value {
+                    #[cfg(not(feature = "bigdecimal"))]
+                    Value::Number(s, _) => match s.as_str() {
+                        "0" => AlterTableStatsAutoRecalc::Zero,
+                        "1" => AlterTableStatsAutoRecalc::One,
+                        _ => return self.expected("DEFAULT, 0, or 1 after STATS_AUTO_RECALC [=]", self.peek_token()),
+                    },
+                    #[cfg(feature = "bigdecimal")]
+                    Value::Number(n, _) => {
+                        if n == &0.into() {
+                            AlterTableStatsAutoRecalc::Zero
+                        } else if n == &1.into() {
+                            AlterTableStatsAutoRecalc::One
+                        } else {
+                            return self.expected("DEFAULT, 0, or 1 after STATS_AUTO_RECALC [=]", self.peek_token())
+                        }
+                    }
+                    _ => return self.expected("DEFAULT, 0, or 1 after STATS_AUTO_RECALC [=]", self.peek_token()),
+                }
+            };
+            AlterTableOperation::StatsAutoRecalc { equals, value }
         } else if self.parse_keywords(&[Keyword::REPLICA, Keyword::IDENTITY]) {
             let identity = if self.parse_keyword(Keyword::NONE) {
                 ReplicaIdentity::None

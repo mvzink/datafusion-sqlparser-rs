@@ -3137,6 +3137,90 @@ fn parse_alter_table_auto_increment() {
 }
 
 #[test]
+fn parse_alter_table_checksum() {
+    let sql = "ALTER TABLE tab CHECKSUM = 1";
+    let expected_operation = AlterTableOperation::Checksum {
+        equals: true,
+        value: 1,
+    };
+    let operation = alter_table_op(mysql().verified_stmt(sql));
+    assert_eq!(expected_operation, operation);
+
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` CHECKSUM 0");
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` CHECKSUM = 1");
+}
+
+#[test]
+fn parse_alter_table_delay_key_write() {
+    let sql = "ALTER TABLE tab DELAY_KEY_WRITE = 0";
+    let expected_operation = AlterTableOperation::DelayKeyWrite {
+        equals: true,
+        value: 0,
+    };
+    let operation = alter_table_op(mysql().verified_stmt(sql));
+    assert_eq!(expected_operation, operation);
+
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` DELAY_KEY_WRITE 1");
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` DELAY_KEY_WRITE = 0");
+}
+
+#[test]
+fn parse_alter_table_force() {
+    let sql = "ALTER TABLE tab FORCE";
+    let expected_operation = AlterTableOperation::Force;
+    let operation = alter_table_op(mysql().verified_stmt(sql));
+    assert_eq!(expected_operation, operation);
+}
+
+#[test]
+fn parse_alter_table_row_format() {
+    let sql = "ALTER TABLE tab ROW_FORMAT = COMPACT";
+    let expected_operation = AlterTableOperation::RowFormat {
+        equals: true,
+        format: AlterTableRowFormat::Compact,
+    };
+    let operation = alter_table_op(mysql().verified_stmt(sql));
+    assert_eq!(expected_operation, operation);
+
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` ROW_FORMAT DEFAULT");
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` ROW_FORMAT = DYNAMIC");
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` ROW_FORMAT = FIXED");
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` ROW_FORMAT = COMPRESSED");
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` ROW_FORMAT = REDUNDANT");
+}
+
+#[test]
+fn parse_alter_table_stats_auto_recalc() {
+    let sql = "ALTER TABLE tab STATS_AUTO_RECALC = 1";
+    let expected_operation = AlterTableOperation::StatsAutoRecalc {
+        equals: true,
+        value: AlterTableStatsAutoRecalc::One,
+    };
+    let operation = alter_table_op(mysql().verified_stmt(sql));
+    assert_eq!(expected_operation, operation);
+
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` STATS_AUTO_RECALC 0");
+    mysql_and_generic().verified_stmt("ALTER TABLE `users` STATS_AUTO_RECALC = DEFAULT");
+}
+
+#[test]
+fn parse_alter_table_multiple_table_options() {
+    let sql = "ALTER TABLE t0 CHECKSUM 1, ALGORITHM COPY, DELAY_KEY_WRITE 0, FORCE, STATS_AUTO_RECALC 1, ROW_FORMAT COMPACT";
+    match mysql().verified_stmt(sql) {
+        Statement::AlterTable(AlterTable { operations, .. }) => {
+            assert_eq!(operations.len(), 6);
+            assert_eq!(operations[0], AlterTableOperation::Checksum { equals: false, value: 1 });
+            assert_eq!(operations[1], AlterTableOperation::Algorithm { equals: false, algorithm: AlterTableAlgorithm::Copy });
+            assert_eq!(operations[2], AlterTableOperation::DelayKeyWrite { equals: false, value: 0 });
+            assert_eq!(operations[3], AlterTableOperation::Force);
+            assert_eq!(operations[4], AlterTableOperation::StatsAutoRecalc { equals: false, value: AlterTableStatsAutoRecalc::One });
+            assert_eq!(operations[5], AlterTableOperation::RowFormat { equals: false, format: AlterTableRowFormat::Compact });
+        }
+        _ => unreachable!(),
+    }
+}
+
+#[test]
 fn parse_alter_table_modify_column_with_column_position() {
     let expected_name = ObjectName::from(vec![Ident::new("orders")]);
     let expected_operation_first = AlterTableOperation::ModifyColumn {

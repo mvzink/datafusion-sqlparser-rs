@@ -411,6 +411,48 @@ pub enum AlterTableOperation {
         equals: bool,
         value: ValueWithSpan,
     },
+    /// `CHECKSUM [=] {0 | 1}`
+    ///
+    /// [MySQL]-specific table option for checksum.
+    ///
+    /// [MySQL]: https://dev.mysql.com/doc/refman/8.4/en/alter-table.html
+    Checksum {
+        equals: bool,
+        value: u8,
+    },
+    /// `DELAY_KEY_WRITE [=] {0 | 1}`
+    ///
+    /// [MySQL]-specific table option for delay key write.
+    ///
+    /// [MySQL]: https://dev.mysql.com/doc/refman/8.4/en/alter-table.html
+    DelayKeyWrite {
+        equals: bool,
+        value: u8,
+    },
+    /// `FORCE`
+    ///
+    /// [MySQL]-specific table option to force table rebuild.
+    ///
+    /// [MySQL]: https://dev.mysql.com/doc/refman/8.4/en/alter-table.html
+    Force,
+    /// `ROW_FORMAT [=] <format>`
+    ///
+    /// [MySQL]-specific table option for row format.
+    ///
+    /// [MySQL]: https://dev.mysql.com/doc/refman/8.4/en/alter-table.html
+    RowFormat {
+        equals: bool,
+        format: AlterTableRowFormat,
+    },
+    /// `STATS_AUTO_RECALC [=] {DEFAULT | 0 | 1}`
+    ///
+    /// [MySQL]-specific table option for stats auto recalc.
+    ///
+    /// [MySQL]: https://dev.mysql.com/doc/refman/8.4/en/alter-table.html
+    StatsAutoRecalc {
+        equals: bool,
+        value: AlterTableStatsAutoRecalc,
+    },
     /// `VALIDATE CONSTRAINT <name>`
     ValidateConstraint {
         name: Ident,
@@ -514,6 +556,56 @@ impl fmt::Display for AlterTableLock {
             Self::None => "NONE",
             Self::Shared => "SHARED",
             Self::Exclusive => "EXCLUSIVE",
+        })
+    }
+}
+
+/// [MySQL] `ALTER TABLE` row format.
+///
+/// [MySQL]: https://dev.mysql.com/doc/refman/8.4/en/alter-table.html
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub enum AlterTableRowFormat {
+    Default,
+    Dynamic,
+    Fixed,
+    Compressed,
+    Redundant,
+    Compact,
+}
+
+impl fmt::Display for AlterTableRowFormat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match self {
+            Self::Default => "DEFAULT",
+            Self::Dynamic => "DYNAMIC",
+            Self::Fixed => "FIXED",
+            Self::Compressed => "COMPRESSED",
+            Self::Redundant => "REDUNDANT",
+            Self::Compact => "COMPACT",
+        })
+    }
+}
+
+/// [MySQL] `ALTER TABLE` stats auto recalc.
+///
+/// [MySQL]: https://dev.mysql.com/doc/refman/8.4/en/alter-table.html
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub enum AlterTableStatsAutoRecalc {
+    Default,
+    Zero,
+    One,
+}
+
+impl fmt::Display for AlterTableStatsAutoRecalc {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match self {
+            Self::Default => "DEFAULT",
+            Self::Zero => "0",
+            Self::One => "1",
         })
     }
 }
@@ -879,6 +971,21 @@ impl fmt::Display for AlterTableOperation {
                     if *equals { "= " } else { "" },
                     value
                 )
+            }
+            AlterTableOperation::Checksum { equals, value } => {
+                write!(f, "CHECKSUM {}{}", if *equals { "= " } else { "" }, value)
+            }
+            AlterTableOperation::DelayKeyWrite { equals, value } => {
+                write!(f, "DELAY_KEY_WRITE {}{}", if *equals { "= " } else { "" }, value)
+            }
+            AlterTableOperation::Force => {
+                write!(f, "FORCE")
+            }
+            AlterTableOperation::RowFormat { equals, format } => {
+                write!(f, "ROW_FORMAT {}{}", if *equals { "= " } else { "" }, format)
+            }
+            AlterTableOperation::StatsAutoRecalc { equals, value } => {
+                write!(f, "STATS_AUTO_RECALC {}{}", if *equals { "= " } else { "" }, value)
             }
             AlterTableOperation::Lock { equals, lock } => {
                 write!(f, "LOCK {}{}", if *equals { "= " } else { "" }, lock)
