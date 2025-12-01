@@ -5089,6 +5089,33 @@ fn parse_alter_table_constraints() {
 }
 
 #[test]
+fn parse_alter_table_constraint_check_without_name() {
+    // CONSTRAINT CHECK without a name should parse and canonicalize to just CHECK
+    one_statement_parses_to(
+        "ALTER TABLE tab ADD CONSTRAINT CHECK (x > 1)",
+        "ALTER TABLE tab ADD CHECK (x > 1)",
+    );
+    one_statement_parses_to(
+        "CREATE TABLE t (x INT, CONSTRAINT CHECK (x > 1))",
+        "CREATE TABLE t (x INT, CHECK (x > 1))",
+    );
+
+    // Other constraint types should also work without names
+    one_statement_parses_to(
+        "ALTER TABLE tab ADD CONSTRAINT PRIMARY KEY (id)",
+        "ALTER TABLE tab ADD PRIMARY KEY (id)",
+    );
+    one_statement_parses_to(
+        "ALTER TABLE tab ADD CONSTRAINT UNIQUE (email)",
+        "ALTER TABLE tab ADD UNIQUE (email)",
+    );
+    one_statement_parses_to(
+        "ALTER TABLE tab ADD CONSTRAINT FOREIGN KEY (user_id) REFERENCES users(id)",
+        "ALTER TABLE tab ADD FOREIGN KEY (user_id) REFERENCES users(id)",
+    );
+}
+
+#[test]
 fn parse_alter_table_drop_column() {
     check_one("DROP COLUMN IF EXISTS is_active");
     check_one("DROP COLUMN IF EXISTS is_active CASCADE");
