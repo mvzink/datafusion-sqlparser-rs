@@ -2538,7 +2538,13 @@ impl<'a> Parser<'a> {
         self.expect_token(&Token::LParen)?;
         let expr = self.parse_expr()?;
         self.expect_keyword_is(Keyword::AS)?;
-        let data_type = self.parse_data_type()?;
+        let mut data_type = self.parse_data_type()?;
+
+        if dialect_of!(self is MySqlDialect | GenericDialect) && self.parse_keyword(Keyword::ARRAY)
+        {
+            data_type = DataType::Array(ArrayElemTypeDef::Suffix(Box::new(data_type)));
+        }
+
         let format = self.parse_optional_cast_format()?;
         self.expect_token(&Token::RParen)?;
         Ok(Expr::Cast {

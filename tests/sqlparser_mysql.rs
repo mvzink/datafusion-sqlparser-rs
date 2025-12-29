@@ -4354,3 +4354,10 @@ fn test_create_index_options() {
         "CREATE INDEX idx_name ON t(c1, c2) USING BTREE LOCK = EXCLUSIVE ALGORITHM = DEFAULT",
     );
 }
+
+#[test]
+fn test_functional_key_part_cast_array() {
+    let sql = "CREATE TABLE t (`uuid` INT, `col_json` JSON, `col_2` INT, KEY `test_idx` (`uuid`,(cast(`col_json` as unsigned array)),`col_2`))";
+    let canonical = "CREATE TABLE t (`uuid` INT, `col_json` JSON, `col_2` INT, KEY `test_idx` (`uuid`, (CAST(`col_json` AS UNSIGNED ARRAY)), `col_2`))";
+    mysql().one_statement_parses_to(sql, canonical);
+}
