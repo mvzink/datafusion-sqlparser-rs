@@ -181,6 +181,16 @@ impl Dialect for GenericDialect {
         true
     }
 
+    fn comment_hint_prefix_len(&self, comment: &str) -> Option<usize> {
+        if comment.starts_with('!') {
+            let rest = &comment[1..];
+            let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+            Some(1 + digits)
+        } else {
+            None
+        }
+    }
+
     fn supports_user_host_grantee(&self) -> bool {
         true
     }

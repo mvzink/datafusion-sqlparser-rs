@@ -957,12 +957,19 @@ impl<'a> Tokenizer<'a> {
 
             // Check if this is a multiline comment hint that should be expanded
             match &token {
-                Token::Whitespace(Whitespace::MultiLineComment(comment))
-                    if self.dialect.supports_multiline_comment_hints()
-                        && comment.starts_with('!') =>
-                {
-                    // Re-tokenize the hints and add them to the buffer
-                    self.tokenize_comment_hints(comment, span, buf, &mut mapper)?;
+                Token::Whitespace(Whitespace::MultiLineComment(comment)) => {
+                    if let Some(prefix_len) =
+                        self.dialect.comment_hint_prefix_len(comment)
+                    {
+                        self.tokenize_comment_hints(
+                            &comment[prefix_len..],
+                            span,
+                            buf,
+                            &mut mapper,
+                        )?;
+                    } else {
+                        buf.push(mapper(TokenWithSpan { token, span }));
+                    }
                 }
                 _ => {
                     buf.push(mapper(TokenWithSpan { token, span }));
@@ -974,21 +981,15 @@ impl<'a> Tokenizer<'a> {
         Ok(())
     }
 
-    /// Re-tokenize optimizer hints from a multiline comment and add them to the buffer.
-    /// For example, `/*!50110 KEY_BLOCK_SIZE = 1024*/` becomes tokens for `KEY_BLOCK_SIZE = 1024`
+    /// Re-tokenize hint content from a multiline comment and add the resulting tokens to the buffer.
+    /// The caller is responsible for stripping any dialect-specific prefix before passing `hint_content`.
     fn tokenize_comment_hints(
         &self,
-        comment: &str,
+        hint_content: &str,
         span: Span,
         buf: &mut Vec<TokenWithSpan>,
         mut mapper: impl FnMut(TokenWithSpan) -> TokenWithSpan,
     ) -> Result<(), TokenizerError> {
-        // Strip the leading '!' and any version digits (e.g., "50110")
-        let hint_content = comment
-            .strip_prefix('!')
-            .unwrap_or(comment)
-            .trim_start_matches(|c: char| c.is_ascii_digit());
-
         // If there's no content after stripping, nothing to tokenize
         if hint_content.is_empty() {
             return Ok(());
@@ -4393,6 +4394,72 @@ mod tests {
                 Token::Whitespace(Whitespace::Space),
                 Token::Whitespace(Whitespace::Space),
                 Token::Whitespace(Whitespace::Space),
+                Token::Whitespace(Whitespace::Space),
+                Token::Number("1".to_string(), false),
+            ],
+            tokens,
+        );
+    }
+
+    #[test]
+    fn tokenize_multiline_comment_with_custom_hint_prefix() {
+        use crate::dialect::Dialect;
+
+        #[derive(Debug)]
+        struct CustomHintDialect;
+
+        impl Dialect for CustomHintDialect {
+            fn is_identifier_start(&self, ch: char) -> bool {
+                ch.is_ascii_lowercase() || ch.is_ascii_uppercase() || ch == '_'
+            }
+
+            fn is_identifier_part(&self, ch: char) -> bool {
+                ch.is_ascii_alphanumeric() || ch == '_'
+            }
+
+            fn comment_hint_prefix_len(&self, comment: &str) -> Option<usize> {
+                if comment.starts_with("hint ") {
+                    Some(5)
+                } else {
+                    None
+                }
+            }
+
+            fn is_delimited_identifier_start(&self, ch: char) -> bool {
+                ch == '"'
+            }
+        }
+
+        let dialect = CustomHintDialect;
+
+        // Custom hint prefix is expanded into tokens
+        let tokens = Tokenizer::new(&dialect, "SELECT /*hint foo bar*/ 1")
+            .tokenize()
+            .unwrap();
+        compare(
+            vec![
+                Token::make_keyword("SELECT"),
+                Token::Whitespace(Whitespace::Space),
+                Token::make_word("foo", None),
+                Token::Whitespace(Whitespace::Space),
+                Token::make_word("bar", None),
+                Token::Whitespace(Whitespace::Space),
+                Token::Number("1".to_string(), false),
+            ],
+            tokens,
+        );
+
+        // Non-matching comment is preserved as MultiLineComment
+        let tokens = Tokenizer::new(&dialect, "SELECT /* normal comment */ 1")
+            .tokenize()
+            .unwrap();
+        compare(
+            vec![
+                Token::make_keyword("SELECT"),
+                Token::Whitespace(Whitespace::Space),
+                Token::Whitespace(Whitespace::MultiLineComment(
+                    " normal comment ".to_string(),
+                )),
                 Token::Whitespace(Whitespace::Space),
                 Token::Number("1".to_string(), false),
             ],

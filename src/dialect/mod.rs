@@ -1105,6 +1105,17 @@ pub trait Dialect: Debug + Any {
         false
     }
 
+    /// If a multiline comment's body matches a hint pattern, returns the byte
+    /// length of the prefix to skip before re-tokenizing the remainder as SQL.
+    ///
+    /// For example, MySQL `/*!50110 KEY_BLOCK_SIZE = 1024*/` has body
+    /// `!50110 KEY_BLOCK_SIZE = 1024`. Returning `Some(6)` skips `!50110`.
+    ///
+    /// Returns `None` (default) to keep the comment as-is.
+    fn comment_hint_prefix_len(&self, _comment: &str) -> Option<usize> {
+        None
+    }
+
     /// Returns true if this dialect supports treating the equals operator `=` within a `SelectItem`
     /// as an alias assignment operator, rather than a boolean expression.
     /// For example: the following statements are equivalent for such a dialect:

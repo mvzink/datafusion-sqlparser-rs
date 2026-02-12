@@ -94,6 +94,18 @@ impl Dialect for MySqlDialect {
         true
     }
 
+    /// MySQL version-conditional comments: `/*!50110 KEY_BLOCK_SIZE = 1024*/`
+    /// The body starts with `!` followed by optional version digits.
+    fn comment_hint_prefix_len(&self, comment: &str) -> Option<usize> {
+        if comment.starts_with('!') {
+            let rest = &comment[1..];
+            let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+            Some(1 + digits)
+        } else {
+            None
+        }
+    }
+
     fn parse_infix(
         &self,
         parser: &mut crate::parser::Parser,
